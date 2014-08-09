@@ -19,6 +19,7 @@
 #import "POPAnimation.h"
 #import "POPAnimationExtras.h"
 #import "POPBasicAnimationInternal.h"
+#import "POPDecayAnimation.h"
 
 using namespace std;
 using namespace POP;
@@ -97,6 +98,9 @@ static BOOL _disableBackgroundThread = YES;
 @end
 
 @implementation POPAnimator
+@synthesize delegate = _delegate;
+@synthesize disableDisplayLink = _disableDisplayLink;
+@synthesize beginTime = _beginTime;
 
 #if !TARGET_OS_IPHONE
 static CVReturn displayLinkCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *now, const CVTimeStamp *outputTime, CVOptionFlags flagsIn, CVOptionFlags *flagsOut, void *context)
@@ -263,7 +267,7 @@ static void stopAndCleanup(POPAnimator *self, POPAnimatorItemRef item, bool shou
     // lock
     OSSpinLockLock(&self->_lock);
 
-    // find item im list
+    // find item in list
     // may have already been removed on animationDidStop:
     POPAnimatorItemListIterator find_iter = find(self->_list.begin(), self->_list.end(), item);
     BOOL found = find_iter != self->_list.end();
@@ -335,7 +339,8 @@ static void stopAndCleanup(POPAnimator *self, POPAnimatorItemRef item, bool shou
 - (void)_processPendingList
 {
   // rendering pending animations
-  [self _renderTime:(0 != _beginTime) ? _beginTime : CACurrentMediaTime() items:_pendingList];
+  CFTimeInterval time = [self _currentRenderTime];
+  [self _renderTime:(0 != _beginTime) ? _beginTime : time items:_pendingList];
 
   // lock
   OSSpinLockLock(&_lock);
@@ -389,7 +394,8 @@ static void stopAndCleanup(POPAnimator *self, POPAnimatorItemRef item, bool shou
   [CATransaction setDisableActions:YES];
 
   // notify delegate
-  [_delegate animatorWillAnimate:self];
+  __strong __typeof__(_delegate) delegate = _delegate;
+  [delegate animatorWillAnimate:self];
 
   // lock
   OSSpinLockLock(&_lock);
@@ -426,7 +432,7 @@ static void stopAndCleanup(POPAnimator *self, POPAnimatorItemRef item, bool shou
   OSSpinLockUnlock(&_lock);
 
   // notify delegate and commit
-  [_delegate animatorDidAnimate:self];
+  [delegate animatorDidAnimate:self];
   [CATransaction commit];
 }
 
@@ -451,13 +457,46 @@ static void stopAndCleanup(POPAnimator *self, POPAnimatorItemRef item, bool shou
       applyAnimationTime(obj, state, time);
 
       FBLogAnimDebug(@"time:%f running:%@", time, item->animation);
-
       if (state->isDone()) {
         // set end value
         applyAnimationProgress(obj, state, 1.0);
 
-        // finished succesfully, cleanup
-        stopAndCleanup(self, item, state->removedOnCompletion, YES);
+        state->repeatCount--;
+        if (state->repeatForever || state->repeatCount > 0) {
+          if ([anim isKindOfClass:[POPPropertyAnimation class]]) {
+            POPPropertyAnimation *propAnim = (POPPropertyAnimation *)anim;
+            id oldFromValue = propAnim.fromValue;
+            propAnim.fromValue = propAnim.toValue;
+
+            if (state->autoreverses) {
+              if (state->tracing) {
+                [state->tracer autoreversed];
+              }
+
+              if (state->type == kPOPAnimationDecay) {
+                POPDecayAnimation *decayAnimation = (POPDecayAnimation *)propAnim;
+                decayAnimation.velocity = [decayAnimation reversedVelocity];
+              } else {
+                propAnim.toValue = oldFromValue;
+              }
+            } else {
+              if (state->type == kPOPAnimationDecay) {
+                POPDecayAnimation *decayAnimation = (POPDecayAnimation *)propAnim;
+                id originalVelocity = decayAnimation.originalVelocity;
+                decayAnimation.velocity = originalVelocity;
+              } else {
+                propAnim.fromValue = oldFromValue;
+              }
+            }
+          }
+
+          state->stop(NO, NO);
+          state->reset(true);
+
+          state->startIfNeeded(obj, time, _slowMotionAccumulator);
+        } else {
+          stopAndCleanup(self, item, state->removedOnCompletion, YES);
+        }
       }
     }
   }
@@ -648,7 +687,7 @@ static void stopAndCleanup(POPAnimator *self, POPAnimatorItemRef item, bool shou
   return animation;
 }
 
-- (void)render
+- (CFTimeInterval)_currentRenderTime
 {
   CFTimeInterval time = CACurrentMediaTime();
 
@@ -672,6 +711,12 @@ static void stopAndCleanup(POPAnimator *self, POPAnimatorItemRef item, bool shou
   }
 #endif
 
+  return time;
+}
+
+- (void)render
+{
+  CFTimeInterval time = [self _currentRenderTime];
   [self renderTime:time];
 }
 

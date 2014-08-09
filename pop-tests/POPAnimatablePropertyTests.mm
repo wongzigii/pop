@@ -9,7 +9,7 @@
 
 #import <SenTestingKit/SenTestingKit.h>
 
-#import <POP/POPAnimatableProperty.h>
+#import <pop/POPAnimatableProperty.h>
 
 static const CGFloat epsilon = 0.0001f;
 static NSArray *properties = @[@"name", @"readBlock", @"writeBlock", @"threshold"];
@@ -48,6 +48,8 @@ static void assertPropertyEqual(id self, POPAnimatableProperty *prop1, POPAnimat
                      kPOPLayerShadowOpacity,
                      kPOPLayerShadowRadius,
                      kPOPLayerCornerRadius,
+                     kPOPLayerBorderWidth,
+                     kPOPLayerBorderColor,
                      kPOPShapeLayerStrokeStart,
                      kPOPShapeLayerStrokeEnd,
                      kPOPShapeLayerStrokeColor,
@@ -58,9 +60,12 @@ static void assertPropertyEqual(id self, POPAnimatableProperty *prop1, POPAnimat
                      kPOPViewFrame,
                      kPOPViewBounds,
                      kPOPViewSize,
+                     kPOPViewTintColor,
                      kPOPScrollViewZoomScale,
                      kPOPTableViewContentSize,
                      kPOPTableViewContentOffset,
+                     kPOPCollectionViewContentSize,
+                     kPOPCollectionViewContentSize,
                      kPOPLabelTextColor
 #endif
                      ];

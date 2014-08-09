@@ -12,9 +12,9 @@
 #import <OCMock/OCMock.h>
 #import <SenTestingKit/SenTestingKit.h>
 
-#import <POP/POP.h>
-#import <POP/POPAnimationPrivate.h>
-#import <POP/POPAnimatorPrivate.h>
+#import <pop/POP.h>
+#import <pop/POPAnimationPrivate.h>
+#import <pop/POPAnimatorPrivate.h>
 
 #import "POPAnimatable.h"
 #import "POPAnimationRuntime.h"
@@ -117,6 +117,134 @@ using namespace POP;
   POPAnimatorRenderDuration(self.animator, self.beginTime, 1, 0.25);
 
   [layer verify];
+}
+
+- (void)testNoAutoreverseRepeatCount0
+{
+  CALayer *layer1 = self.layer1;
+  [layer1 removeAllAnimations];
+
+  POPBasicAnimation *anim = FBTestLinearPositionAnimation(self.beginTime);
+  anim.repeatCount = 0;
+  anim.roundingFactor = 1.0;
+  anim.autoreverses = NO;
+
+  NSValue *originalToValue = anim.toValue;
+
+  [layer1 pop_addAnimation:anim forKey:@"key"];
+  POPAnimatorRenderDuration(self.animator, self.beginTime, 2.0, 0.25); // animate longer than needed to verify animation has stopped in the appropriate place
+
+  STAssertEqualObjects([layer1 valueForKeyPath:@"position"], originalToValue, @"expected equality; value1:%@ value2:%@", [layer1 valueForKey:@"position"], originalToValue);
+}
+
+- (void)testNoAutoreverseRepeatCount1
+{
+  CALayer *layer1 = self.layer1;
+  [layer1 removeAllAnimations];
+
+  POPBasicAnimation *anim = FBTestLinearPositionAnimation(self.beginTime);
+  anim.repeatCount = 1;
+  anim.roundingFactor = 1.0;
+  anim.autoreverses = NO;
+
+  NSValue *originalToValue = anim.toValue;
+
+  [layer1 pop_addAnimation:anim forKey:@"key"];
+  POPAnimatorRenderDuration(self.animator, self.beginTime, 3.0, 0.25); // animate longer than needed to verify animation has stopped in the appropriate place
+
+  STAssertEqualObjects([layer1 valueForKeyPath:@"position"], originalToValue, @"expected equality; value1:%@ value2:%@", [layer1 valueForKey:@"position"], originalToValue);
+}
+
+- (void)testNoAutoreverseRepeatCount4
+{
+  CALayer *layer1 = self.layer1;
+  [layer1 removeAllAnimations];
+
+  POPBasicAnimation *anim = FBTestLinearPositionAnimation(self.beginTime);
+  anim.repeatCount = 4;
+  anim.roundingFactor = 1.0;
+  anim.autoreverses = NO;
+
+  NSValue *originalToValue = anim.toValue;
+
+  [layer1 pop_addAnimation:anim forKey:@"key"];
+  POPAnimatorRenderDuration(self.animator, self.beginTime, 6.0, 0.25); // animate longer than needed to verify animation has stopped in the appropriate place
+
+  STAssertEqualObjects([layer1 valueForKeyPath:@"position"], originalToValue, @"expected equality; value1:%@ value2:%@", [layer1 valueForKey:@"position"], originalToValue);
+}
+
+- (void)testAutoreverseRepeatCount0
+{
+  CALayer *layer1 = self.layer1;
+  [layer1 removeAllAnimations];
+
+  POPBasicAnimation *anim = FBTestLinearPositionAnimation(self.beginTime);
+  anim.roundingFactor = 1.0;
+  anim.autoreverses = YES;
+  anim.repeatCount = 0;
+  [anim.tracer start];
+
+  NSValue *originalFromValue = anim.fromValue;
+
+  [layer1 pop_addAnimation:anim forKey:@"key"];
+  POPAnimatorRenderDuration(self.animator, self.beginTime, 3.0, 0.25); // animate longer than needed to verify animation has stopped in the appropriate place
+
+  STAssertEqualObjects([layer1 valueForKey:@"position"], originalFromValue, @"expected equality; value1:%@ value2:%@", [layer1 valueForKey:@"position"], originalFromValue);
+
+  NSArray *autoreversedEvents = [anim.tracer eventsWithType:kPOPAnimationEventAutoreversed];
+  STAssertTrue(1 == autoreversedEvents.count, @"unexpected autoreversed events %@", autoreversedEvents);
+
+  anim.autoreverses = NO;
+}
+
+- (void)testAutoreverseRepeatCount1
+{
+  CALayer *layer1 = self.layer1;
+  [layer1 removeAllAnimations];
+
+  POPBasicAnimation *anim = FBTestLinearPositionAnimation(self.beginTime);
+  anim.roundingFactor = 1.0;
+  anim.autoreverses = YES;
+  anim.repeatCount = 1;
+  [anim.tracer start];
+
+  NSValue *originalFromValue = anim.fromValue;
+
+  [layer1 pop_addAnimation:anim forKey:@"key"];
+  POPAnimatorRenderDuration(self.animator, self.beginTime, 3.0, 0.25); // animate longer than needed to verify animation has stopped in the appropriate place
+
+  STAssertEqualObjects([layer1 valueForKey:@"position"], originalFromValue, @"expected equality; value1:%@ value2:%@", [layer1 valueForKey:@"position"], originalFromValue);
+
+  NSArray *autoreversedEvents = [anim.tracer eventsWithType:kPOPAnimationEventAutoreversed];
+  STAssertTrue(1 == autoreversedEvents.count, @"unexpected autoreversed events %@", autoreversedEvents);
+
+  anim.autoreverses = NO;
+}
+
+- (void)testAutoreverseRepeatCount4
+{
+  CALayer *layer1 = self.layer1;
+  [layer1 removeAllAnimations];
+
+  POPBasicAnimation *anim = FBTestLinearPositionAnimation(self.beginTime);
+  anim.roundingFactor = 1.0;
+  anim.autoreverses = YES;
+
+  NSInteger repeatCount = 4;
+  anim.repeatCount = repeatCount;
+  [anim.tracer start];
+
+  NSValue *originalFromValue = anim.fromValue;
+
+  [layer1 pop_addAnimation:anim forKey:@"key"];
+  POPAnimatorRenderDuration(self.animator, self.beginTime, 9.0, 0.25); // animate longer than needed to verify animation has stopped in the appropriate place
+
+  STAssertEqualObjects([layer1 valueForKey:@"position"], originalFromValue, @"expected equality; value1:%@ value2:%@", [layer1 valueForKey:@"position"], originalFromValue);
+
+  NSArray *autoreversedEvents = [anim.tracer eventsWithType:kPOPAnimationEventAutoreversed];
+  STAssertTrue((repeatCount * 2) - 1 == (int)autoreversedEvents.count, @"unexpected autoreversed events %@", autoreversedEvents);
+
+  anim.autoreverses = NO;
 }
 
 - (void)testReAddition
@@ -288,9 +416,24 @@ using namespace POP;
   STAssertEqualObjects(anim2.toValue, rectValue, @"property value read should equal write");
   STAssertEqualObjects(anim2.velocity, rectValue, @"property value read should equal write");
 
+#if TARGET_OS_IPHONE
+
   POPSpringAnimation *anim3 = [POPSpringAnimation animation];
+
+  id edgeInsetsValue = [NSValue valueWithUIEdgeInsets:UIEdgeInsetsMake(20, 40, 20, 40)];
+  anim3.fromValue = edgeInsetsValue;
+  anim3.toValue = edgeInsetsValue;
+  anim3.velocity = edgeInsetsValue;
+
+  STAssertEqualObjects(anim3.fromValue, edgeInsetsValue, @"property value read should equal write");
+  STAssertEqualObjects(anim3.toValue, edgeInsetsValue, @"property value read should equal write");
+  STAssertEqualObjects(anim3.velocity, edgeInsetsValue, @"property value read should equal write");
+
+#endif
+
+  POPSpringAnimation *anim4 = [POPSpringAnimation animation];
   id transformValue = [NSValue valueWithCATransform3D:CATransform3DIdentity];
-  STAssertThrows(anim3.fromValue = transformValue, @"should not be able to set %@", transformValue);
+  STAssertThrows(anim4.fromValue = transformValue, @"should not be able to set %@", transformValue);
 }
 
 - (void)testTracer

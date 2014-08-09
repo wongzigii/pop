@@ -9,8 +9,13 @@
 
 #import "POPAnimationTestsExtras.h"
 
-#import <POP/POP.h>
-#import <POP/POPAnimatorPrivate.h>
+#import <pop/POP.h>
+#import <pop/POPAnimatorPrivate.h>
+
+void POPAnimatorRenderTime(POPAnimator *animator, CFTimeInterval beginTime, CFTimeInterval time)
+{
+  [animator renderTime:beginTime + time];
+}
 
 void POPAnimatorRenderTimes(POPAnimator *animator, CFTimeInterval beginTime, NSArray *times)
 {
